@@ -26,9 +26,9 @@ on:
         type: string
         default: ""
       fail_stop:
-        description: \"Stop early after N consecutive failures\"
+        description: "Stop early after N consecutive failures"
         required: false
-        default: \"6\"
+        default: "6"
         type: string
       pages:
         description: "Pages to generate this run"
@@ -78,6 +78,7 @@ jobs:
       PERF_MAX_WORDS: ${{ github.event.inputs.max_words }}
 
       PAGES_PER_RUN: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.pages) || (github.event_name == 'workflow_dispatch' && inputs.pages) || '5' }}
+      FAIL_STOP: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.fail_stop) || (github.event_name == 'workflow_dispatch' && inputs.fail_stop) || '6' }}
       MAX_ATTEMPTS: "25"
       SLEEP_SECONDS: "0.3"
 
@@ -116,6 +117,11 @@ jobs:
 
       - name: Install deps (from core)
         run: pip install -r _core/requirements.txt
+
+      - name: Sanity check core scripts
+        run: |
+          python -m py_compile _core/scripts/generate_pages.py
+          python -m py_compile _core/scripts/quality_gates.py
 
       - name: Resolve site slug
         id: slug

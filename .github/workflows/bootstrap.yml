@@ -83,6 +83,12 @@ jobs:
       - name: Install dependencies (from core)
         run: pip install -r _core/requirements.txt
 
+      - name: Sanity check core scripts
+        run: |
+          python -m py_compile _core/scripts/bootstrap_site.py
+          python -m py_compile _core/scripts/generate_pages.py
+          python -m py_compile _core/scripts/quality_gates.py
+
       - name: Resolve site slug
         id: slug
         env:
