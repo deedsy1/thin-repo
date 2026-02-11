@@ -12,6 +12,14 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      max_pages:
+        description: "Max total pages allowed for this site (optional override)"
+        required: false
+        default: ""
+      max_words:
+        description: "Max total word count allowed for this site (optional override)"
+        required: false
+        default: ""
       site_slug:
         description: "Optional site slug folder under sites/<slug>. Leave blank to auto-generate from the niche."
         required: false
@@ -49,6 +57,9 @@ jobs:
       KIMI_MODEL: "kimi-k2.5"
       TEMPERATURE: "1"
       MAX_OUTPUT_TOKENS: "1600"
+
+      PERF_MAX_PAGES: ${{ github.event.inputs.max_pages }}
+      PERF_MAX_WORDS: ${{ github.event.inputs.max_words }}
 
       BOOTSTRAP_NICHE: ${{ github.event.inputs.niche }}
       BOOTSTRAP_TONE: ${{ github.event.inputs.tone }}
