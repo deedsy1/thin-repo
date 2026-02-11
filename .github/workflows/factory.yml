@@ -74,6 +74,12 @@ jobs:
       TEMPERATURE: "1"
       MAX_OUTPUT_TOKENS: "1600"
 
+      # Reliability knobs
+      REQUEST_TIMEOUT: 180
+      CONNECT_TIMEOUT: 20
+      KIMI_HTTP_MAX_TRIES: 6
+      KIMI_BACKOFF_BASE: 1.7
+
       PERF_MAX_PAGES: ${{ github.event.inputs.max_pages }}
       PERF_MAX_WORDS: ${{ github.event.inputs.max_words }}
 
