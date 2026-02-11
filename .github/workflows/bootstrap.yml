@@ -1,62 +1,37 @@
-name: Bootstrap Site
-
-permissions:
-  contents: write
+name: Bootstrap Site (Thin)
 
 on:
   workflow_dispatch:
     inputs:
       niche:
-        description: "Niche/topic for the site (e.g. 'work anxiety', 'home espresso basics')"
+        description: "Site niche (required)"
         required: true
       tone:
-        description: "Optional tone (e.g. 'calm, encyclopedic, beginner-friendly')"
+        description: "Optional tone"
         required: false
         default: ""
       title_count:
-        description: "How many titles to generate into scripts/titles_pool.txt"
+        description: "Titles to generate"
         required: false
         default: "300"
       pages_now:
-        description: "How many pages to generate immediately after bootstrapping"
+        description: "Generate N pages immediately after bootstrapping"
         required: false
         default: "5"
       base_url:
-        description: "Optional baseURL for hugo.yaml (e.g. https://your-site.pages.dev/)"
+        description: "Optional baseURL (Cloudflare Pages URL)"
         required: false
-        default: "https://YOUR-SITE.pages.dev/"
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   bootstrap:
-    runs-on: ubuntu-22.04
-    env:
-      FACTORY_ENABLED: "1"
-      FACTORY_COMMIT_MODE: "main"
-
-      MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-      MOONSHOT_BASE_URL: "https://api.moonshot.ai/v1"
-      KIMI_MODEL: "kimi-k2.5"
-      TEMPERATURE: "1"
-      MAX_OUTPUT_TOKENS: "1600"
-
-      BOOTSTRAP_NICHE: ${{ github.event.inputs.niche }}
-      BOOTSTRAP_TONE: ${{ github.event.inputs.tone }}
-      TITLE_COUNT: ${{ github.event.inputs.title_count }}
-      PAGES_PER_RUN: ${{ github.event.inputs.pages_now }}
-      BOOTSTRAP_BASE_URL: ${{ github.event.inputs.base_url }}
-
-      MAX_ATTEMPTS: "25"
-      SLEEP_SECONDS: "0.3"
-
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout site repo
         uses: actions/checkout@v4
-
-      - name: STOP switch
-        if: env.FACTORY_ENABLED == '0'
-        run: |
-          echo "FACTORY DISABLED — exiting."
-          exit 0
 
       - name: Checkout website-factory-core
         uses: actions/checkout@v4
@@ -64,32 +39,49 @@ jobs:
           repository: deedsy1/website-factory-core
           path: _core
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
-      - name: Install dependencies (from core)
+      - name: Install dependencies
         run: pip install -r _core/requirements.txt
 
-      - name: Bootstrap site identity + titles pool
+      - name: Bootstrap site config + titles pool
+        env:
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
+          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
+          BOOTSTRAP_NICHE: ${{ inputs.niche }}
+          BOOTSTRAP_TONE: ${{ inputs.tone }}
+          BOOTSTRAP_BASE_URL: ${{ inputs.base_url }}
+          TITLE_COUNT: ${{ inputs.title_count }}
+          PAGES_NOW: ${{ inputs.pages_now }}
+          SITE_CONFIG: data/site.yaml
         run: python _core/scripts/bootstrap_site.py
 
-      - name: Generate pages
+      - name: Generate initial pages
+        env:
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
+          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
+          PAGES_PER_RUN: ${{ inputs.pages_now }}
+          FACTORY_MODE: "generate"
+          SITE_CONFIG: data/site.yaml
+          PLAN_PATH: data/plan.yaml
         run: python _core/scripts/generate_pages.py
 
-      - name: Quality gates (delete failures)
+      - name: Quality gates
+        env:
+          SITE_CONFIG_PATH: data/site.yaml
+          CONTENT_ROOT: content/pages
+          DELETE_ON_FAIL: "1"
         run: python _core/scripts/quality_gates.py
 
-      - name: Commit changes
-        if: env.FACTORY_COMMIT_MODE == 'main'
+      - name: Commit bootstrap output
         run: |
-          git config user.name "factory-bot"
-          git config user.email "factory@users.noreply.github.com"
-          git add .
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-          git commit -m "Bootstrap: ${{ github.event.inputs.niche }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: bootstrap site" || echo "No changes to commit"
           git push
