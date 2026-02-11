@@ -23,8 +23,7 @@ on:
         default: "5"
       base_url:
         description: "Optional baseURL for hugo.yaml (e.g. https://your-site.pages.dev/)"
-        required: false
-        default: "https://YOUR-SITE.pages.dev/"
+        required: false        
 
 jobs:
   bootstrap:
