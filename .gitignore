@@ -1,6 +1,17 @@
 _core/
 
-sites/
+# NOTE: `sites/` is the factory output and MUST be committed.
+# We keep it tracked and only ignore build artifacts inside each site.
+
+# Ignore Hugo build artifacts inside per-site outputs
+sites/**/public/
+sites/**/resources/_gen/
+sites/**/public_dev/
+sites/**/public_out/
+sites/**/.hugo_build.lock
+
+# Ignore per-site debug logs (keep repo clean)
+sites/**/scripts/_logs/
 
 # Python
 __pycache__/
