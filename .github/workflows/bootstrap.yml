@@ -3,85 +3,63 @@ name: Bootstrap Site (Thin)
 on:
   workflow_dispatch:
     inputs:
-      niche:
-        description: "Site niche (required)"
-        required: true
-      tone:
-        description: "Optional tone"
+      core_ref:
+        description: "Core version tag/branch"
         required: false
-        default: ""
+        default: "v1.0.0"
+      niche:
+        description: "Site niche"
+        required: true
       title_count:
         description: "Titles to generate"
         required: false
         default: "300"
       pages_now:
-        description: "Generate N pages immediately after bootstrapping"
+        description: "Pages to generate immediately"
         required: false
         default: "5"
-      base_url:
-        description: "Optional baseURL (Cloudflare Pages URL)"
-        required: false
-        default: ""
 
 permissions:
   contents: write
+
+concurrency:
+  group: bootstrap-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout site repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Checkout website-factory-core
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           repository: deedsy1/website-factory-core
+          ref: ${{ github.event.inputs.core_ref || 'v1.0.0' }}
           path: _core
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install -r _core/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('_core/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      - name: Bootstrap site config + titles pool
-        env:
-          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
-          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
-          BOOTSTRAP_NICHE: ${{ inputs.niche }}
-          BOOTSTRAP_TONE: ${{ inputs.tone }}
-          BOOTSTRAP_BASE_URL: ${{ inputs.base_url }}
-          TITLE_COUNT: ${{ inputs.title_count }}
-          PAGES_NOW: ${{ inputs.pages_now }}
-          SITE_CONFIG: data/site.yaml
-        run: python _core/scripts/bootstrap_site.py
+      - run: pip install -r _core/requirements.txt
 
-      - name: Generate initial pages
-        env:
-          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
-          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
-          PAGES_PER_RUN: ${{ inputs.pages_now }}
-          FACTORY_MODE: "generate"
-          SITE_CONFIG: data/site.yaml
-          PLAN_PATH: data/plan.yaml
-        run: python _core/scripts/generate_pages.py
+      - run: python _core/scripts/bootstrap_site.py --site-root .
 
-      - name: Quality gates
-        env:
-          SITE_CONFIG_PATH: data/site.yaml
-          CONTENT_ROOT: content/pages
-          DELETE_ON_FAIL: "1"
-        run: python _core/scripts/quality_gates.py
+      - run: python _core/scripts/generate_pages.py --site-root .
 
-      - name: Commit bootstrap output
-        run: |
+      - run: python _core/scripts/quality_gates.py --site-root .
+
+      - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: bootstrap site" || echo "No changes to commit"
+          git commit -m "chore: bootstrap site" || echo "No changes"
           git push
