@@ -6,6 +6,10 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      site_slug:
+        description: "Site slug folder under sites/<slug> (e.g. home-espresso-basics)"
+        required: true
+        type: string
       niche:
         description: "Niche/topic for the site (e.g. 'work anxiety', 'home espresso basics')"
         required: true
@@ -72,14 +76,11 @@ jobs:
       - name: Install dependencies (from core)
         run: pip install -r _core/requirements.txt
 
+      - name: Ensure site folder exists
+        run: mkdir -p sites/${{ inputs.site_slug }}
+
       - name: Bootstrap site identity + titles pool
-        run: python -u _core/scripts/bootstrap_site.py --site-root .
-
-      - name: Generate pages
-        run: python -u _core/scripts/generate_pages.py --site-root .
-
-      - name: Quality gates (delete failures)
-        run: python -u _core/scripts/quality_gates.py --site-root .
+        run: python -u _core/scripts/bootstrap_site.py --site-root sites/${{ inputs.site_slug }}
 
       - name: Commit changes
         if: env.FACTORY_COMMIT_MODE == 'main'

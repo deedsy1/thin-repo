@@ -6,6 +6,15 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      site_slug:
+        description: "Site slug folder under sites/<slug> (e.g. home-espresso-basics)"
+        required: true
+        type: string
+      fail_stop:
+        description: \"Stop early after N consecutive failures\"
+        required: false
+        default: \"6\"
+        type: string
       pages:
         description: "Pages to generate this run"
         required: false
@@ -90,11 +99,14 @@ jobs:
       - name: Install deps (from core)
         run: pip install -r _core/requirements.txt
 
+      - name: Ensure site folder exists
+        run: mkdir -p sites/${{ inputs.site_slug }}
+
       - name: Generate pages (core engine)
-        run: python -u _core/scripts/generate_pages.py --site-root .
+        run: python -u _core/scripts/generate_pages.py --site-root sites/${{ inputs.site_slug }}
 
       - name: Quality gates (core engine)
-        run: python -u _core/scripts/quality_gates.py --site-root .
+        run: python -u _core/scripts/quality_gates.py --site-root sites/${{ inputs.site_slug }}
 
       - name: Commit changes
         if: env.FACTORY_COMMIT_MODE == 'main'
