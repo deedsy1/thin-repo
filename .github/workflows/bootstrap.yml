@@ -23,7 +23,8 @@ on:
         default: "5"
       base_url:
         description: "Optional baseURL for hugo.yaml (e.g. https://your-site.pages.dev/)"
-        required: false        
+        required: false
+        default: "https://YOUR-SITE.pages.dev/"
 
 jobs:
   bootstrap:
@@ -72,13 +73,13 @@ jobs:
         run: pip install -r _core/requirements.txt
 
       - name: Bootstrap site identity + titles pool
-        run: python -u _core/scripts/bootstrap_site.py
+        run: python -u _core/scripts/bootstrap_site.py --site-root .
 
       - name: Generate pages
-        run: python -u _core/scripts/generate_pages.py
+        run: python -u _core/scripts/generate_pages.py --site-root .
 
       - name: Quality gates (delete failures)
-        run: python -u _core/scripts/quality_gates.py
+        run: python -u _core/scripts/quality_gates.py --site-root .
 
       - name: Commit changes
         if: env.FACTORY_COMMIT_MODE == 'main'

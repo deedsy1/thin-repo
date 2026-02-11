@@ -91,10 +91,10 @@ jobs:
         run: pip install -r _core/requirements.txt
 
       - name: Generate pages (core engine)
-        run: python -u _core/scripts/generate_pages.py
+        run: python -u _core/scripts/generate_pages.py --site-root .
 
       - name: Quality gates (core engine)
-        run: python -u _core/scripts/quality_gates.py
+        run: python -u _core/scripts/quality_gates.py --site-root .
 
       - name: Commit changes
         if: env.FACTORY_COMMIT_MODE == 'main'
