@@ -1,99 +1,110 @@
-name: Factory - Generate Pages
-
-on:
-  workflow_dispatch:
-    inputs:
-      core_ref:
-        description: "Core version tag/branch (pin for safety)"
-        required: false
-        default: "v1.0.0"
-      pages_per_run:
-        description: "How many pages to generate this run"
-        required: false
-        default: "10"
-      factory_mode:
-        description: "generate or regen"
-        required: false
-        default: "generate"
-      regen_rule:
-        description: "regen rule"
-        required: false
-        default: ""
-      regen_hub:
-        description: "regen only this hub id"
-        required: false
-        default: ""
-      regen_slugs:
-        description: "comma-separated slugs to regen"
-        required: false
-        default: ""
-
-  schedule:
-    - cron: "0 3 * * *"
+name: Evergreen Factory
 
 permissions:
   contents: write
 
-concurrency:
-  group: factory-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
+on:
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: "Pages to generate this run"
+        required: false
+        default: "5"
+      mode:
+        description: "generate or regen"
+        required: false
+        default: "generate"
+      regen_rule:
+        description: "e.g. version_lt:2 or contract_mismatch"
+        required: false
+        default: ""
+      regen_hub:
+        description: "Regenerate pages in this hub"
+        required: false
+        default: ""
+      regen_slugs:
+        description: "Comma-separated slugs to regenerate"
+        required: false
+        default: ""
+      gen_version:
+        description: "Generator version to stamp into pages"
+        required: false
+        default: "2"
+  schedule:
+    - cron: "0 3 * * 1"
+  repository_dispatch:
+    types: [factory_run, factory_regen]
 
 jobs:
-  run:
-    runs-on: ubuntu-latest
+  generate:
+    runs-on: ubuntu-22.04
+
+    env:
+      FACTORY_ENABLED: "1"
+      FACTORY_COMMIT_MODE: "main"
+
+      # Provider (Moonshot/Kimi)
+      MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+      MOONSHOT_BASE_URL: "https://api.moonshot.ai/v1"
+      KIMI_MODEL: "kimi-k2.5"
+      TEMPERATURE: "1"
+      MAX_OUTPUT_TOKENS: "1600"
+
+      PAGES_PER_RUN: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.pages) || (github.event_name == 'workflow_dispatch' && inputs.pages) || '5' }}
+      MAX_ATTEMPTS: "25"
+      SLEEP_SECONDS: "0.3"
+
+      FACTORY_MODE: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.mode) || (github.event_name == 'workflow_dispatch' && inputs.mode) || 'generate' }}
+      REGEN_RULE: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.regen_rule) || (github.event_name == 'workflow_dispatch' && inputs.regen_rule) || '' }}
+      REGEN_HUB: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.regen_hub) || (github.event_name == 'workflow_dispatch' && inputs.regen_hub) || '' }}
+      REGEN_SLUGS: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.regen_slugs) || (github.event_name == 'workflow_dispatch' && inputs.regen_slugs) || '' }}
+      GEN_VERSION: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.gen_version) || (github.event_name == 'workflow_dispatch' && inputs.gen_version) || '2' }}
+
+      BACKFILL_METADATA: "1"
+
+      # Where the core engine will be checked out
+      CORE_REF: "main"
+
     steps:
       - name: Checkout site repo
         uses: actions/checkout@v4
 
-      - name: Checkout website-factory-core (to _core)
+      - name: STOP switch
+        if: env.FACTORY_ENABLED == '0'
+        run: |
+          echo "FACTORY DISABLED — exiting."
+          exit 0
+
+      - name: Checkout website-factory-core
         uses: actions/checkout@v4
         with:
           repository: deedsy1/website-factory-core
-          ref: ${{ github.event.inputs.core_ref || 'v1.0.0' }}
+          ref: ${{ env.CORE_REF }}
           path: _core
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('_core/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies (core)
+      - name: Install deps (from core)
         run: pip install -r _core/requirements.txt
 
-      - name: Generate pages
-        env:
-          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
-          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
-          PAGES_PER_RUN: ${{ inputs.pages_per_run }}
-          FACTORY_MODE: ${{ inputs.factory_mode }}
-          REGEN_RULE: ${{ inputs.regen_rule }}
-          REGEN_HUB: ${{ inputs.regen_hub }}
-          REGEN_SLUGS: ${{ inputs.regen_slugs }}
-        run: python _core/scripts/generate_pages.py --site-root .
+      - name: Generate pages (core engine)
+        run: python -u _core/scripts/generate_pages.py
 
-      - name: Quality gates
-        env:
-          DELETE_ON_FAIL: "1"
-        run: python _core/scripts/quality_gates.py --site-root .
+      - name: Quality gates (core engine)
+        run: python -u _core/scripts/quality_gates.py
 
-      - name: Commit changes (never commit _core)
+      - name: Commit changes
+        if: env.FACTORY_COMMIT_MODE == 'main'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add -A
-          git restore --staged _core || true
-          git rm -r --cached _core 2>/dev/null || true
-          rm -rf _core
-
-          git commit -m "chore: factory run" || echo "No changes to commit"
+          git config user.name "factory-bot"
+          git config user.email "factory@users.noreply.github.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Factory run"
           git push
