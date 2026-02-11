@@ -1,0 +1,33 @@
+baseURL: "https://YOUR-SITE.pages.dev/"
+languageCode: "en-us"
+title: "YOUR SITE TITLE"
+enableRobotsTXT: true
+
+module:
+  imports:
+    - path: github.com/deedsy1/website-factory-core
+
+params:
+  ads:
+    provider: "none"   # none | adsense | journey | raptive
+    adsenseClient: ""  # e.g. ca-pub-xxxxxxxx
+  factory:
+    brand: "YOUR BRAND"
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+
+outputs:
+  home: ["HTML", "RSS"]
+  section: ["HTML", "RSS"]
+  page: ["HTML"]
+
+security:
+  funcs:
+    getenv:
+      - '^HUGO_'
+      - '^CI$'
+      - '^ADS_PROVIDER$'
+      - '^ADSENSE_CLIENT$'

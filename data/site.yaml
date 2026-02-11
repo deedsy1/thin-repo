@@ -1,0 +1,36 @@
+site:
+  title: "YOUR SITE TITLE"
+  brand: "YOUR BRAND"
+  language_code: en-us
+  base_url: "https://YOUR-SITE.pages.dev/"
+  default_meta_description: "Calm, practical reassurance — not advice."
+
+theme:
+  pack: calm-paper
+
+taxonomy:
+  hubs:
+    - id: hub-1
+      label: Hub 1
+
+generation:
+  forbidden_words: []
+  page_types: [is-it-normal, checklist, red-flags, myth-vs-reality, explainer]
+
+internal_linking:
+  enabled: true
+  min_links: 3
+  forbid_external: true
+
+ads:
+  provider: none
+  adsense_client: ""
+
+gates:
+  required_frontmatter: [title, slug, summary, description, date, hub, page_type, gen_version, contract_hash, prompt_hash]
+  wordcount_min: 900
+  wordcount_max: 1900
+  min_internal_links: 3
+  forbid_external_links: true
+  faq_min: 4
+  faq_max: 8
