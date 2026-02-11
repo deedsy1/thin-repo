@@ -1,1 +1,14 @@
 items: []
+# Generation queue. The factory workflow will populate this based on
+# bootstrap output and/or your own curation.
+#
+# Each item:
+# - slug: url-safe slug
+# - title: page title
+# - intent: short purpose (optional)
+#
+# Example:
+# - slug: example-page
+#   title: "Example page"
+
+[]

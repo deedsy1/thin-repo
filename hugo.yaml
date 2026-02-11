@@ -1,6 +1,6 @@
-baseURL: "https://YOUR-SITE.pages.dev/"
+baseURL: "/"
 languageCode: "en-us"
-title: "YOUR SITE TITLE"
+title: "Site"
 enableRobotsTXT: true
 
 module:
@@ -12,7 +12,7 @@ params:
     provider: "none"   # none | adsense | journey | raptive
     adsenseClient: ""  # e.g. ca-pub-xxxxxxxx
   factory:
-    brand: "YOUR BRAND"
+    brand: "Site"
 
 markup:
   goldmark:

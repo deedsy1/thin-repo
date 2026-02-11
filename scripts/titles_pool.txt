@@ -1,0 +1,7 @@
+# This file is intentionally small in the template.
+# The bootstrap workflow will overwrite/append to it with niche-specific titles.
+# Keeping a few sample lines prevents "empty input" edge-cases in local runs.
+
+Example: What is this site about?
+Example: How to use this template
+Example: Common beginner mistakes

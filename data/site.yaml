@@ -1,6 +1,6 @@
 site:
-  title: "YOUR SITE TITLE"
-  brand: "YOUR BRAND"
+title: "Site"
+brand: "Site"
   language_code: en-us
   base_url: "https://YOUR-SITE.pages.dev/"
   default_meta_description: "Calm, practical reassurance — not advice."
