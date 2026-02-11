@@ -1,53 +1,87 @@
-name: Generate Pages
+name: Factory - Generate Pages
 
 on:
   workflow_dispatch:
+    inputs:
+      pages_per_run:
+        description: "How many pages to generate this run"
+        required: false
+        default: "10"
+      factory_mode:
+        description: "generate or regen"
+        required: false
+        default: "generate"
+      regen_rule:
+        description: "regen rule, e.g. contract_mismatch or version_lt:2"
+        required: false
+        default: ""
+      regen_hub:
+        description: "regen only this hub id"
+        required: false
+        default: ""
+      regen_slugs:
+        description: "comma-separated slugs to regen"
+        required: false
+        default: ""
   schedule:
-    - cron: "0 3 * * *"  # optional: daily at 3am UTC
+    - cron: "0 3 * * *"  # optional
+
+permissions:
+  contents: write
 
 jobs:
-  generate:
+  run:
     runs-on: ubuntu-latest
-
     steps:
-      # 1️⃣ Checkout THIS site repo
+      # 1) Checkout site repo (thin-repo)
       - name: Checkout site repo
         uses: actions/checkout@v4
 
-      # 2️⃣ Checkout the golden core repo into _core/
+      # 2) Checkout core into _core/
       - name: Checkout website-factory-core
         uses: actions/checkout@v4
         with:
           repository: deedsy1/website-factory-core
           path: _core
 
-      # 3️⃣ Setup Python
+      # 3) Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 4️⃣ Install core dependencies
+      # 4) Install deps from core
       - name: Install dependencies
         run: pip install -r _core/requirements.txt
 
-      # 5️⃣ Run page generation from core
+      # 5) Generate pages (script uses env vars, not CLI args)
       - name: Generate pages
         env:
           MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-        run: |
-          python _core/scripts/generate_pages.py --site-root .
+          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
+          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
+          PAGES_PER_RUN: ${{ inputs.pages_per_run }}
+          FACTORY_MODE: ${{ inputs.factory_mode }}
+          REGEN_RULE: ${{ inputs.regen_rule }}
+          REGEN_HUB: ${{ inputs.regen_hub }}
+          REGEN_SLUGS: ${{ inputs.regen_slugs }}
+          SITE_CONFIG: data/site.yaml
+          PLAN_PATH: data/plan.yaml
+        run: python _core/scripts/generate_pages.py
 
-      # 6️⃣ Run quality gates from core
-      - name: Run quality gates
-        run: |
-          python _core/scripts/quality_gates.py --site-root .
+      # 6) Run quality gates (deletes failing pages automatically if configured)
+      - name: Quality gates
+        env:
+          SITE_CONFIG_PATH: data/site.yaml
+          CONTENT_ROOT: content/pages
+          DELETE_ON_FAIL: "1"
+        run: python _core/scripts/quality_gates.py
 
-      # 7️⃣ Commit any new/changed content back into THIS repo
+      # 7) Commit changes back to thin-repo
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: generate pages via core" || echo "No changes"
+          git commit -m "chore: factory run" || echo "No changes to commit"
           git push
