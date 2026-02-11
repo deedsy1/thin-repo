@@ -4,13 +4,29 @@ on:
   workflow_dispatch:
     inputs:
       core_ref:
-        description: "Core version tag/branch"
+        description: "Core version tag/branch (pin for safety)"
         required: false
         default: "v1.0.0"
       pages_per_run:
-        description: "Pages per run"
+        description: "How many pages to generate this run"
         required: false
         default: "10"
+      factory_mode:
+        description: "generate or regen"
+        required: false
+        default: "generate"
+      regen_rule:
+        description: "regen rule"
+        required: false
+        default: ""
+      regen_hub:
+        description: "regen only this hub id"
+        required: false
+        default: ""
+      regen_slugs:
+        description: "comma-separated slugs to regen"
+        required: false
+        default: ""
 
   schedule:
     - cron: "0 3 * * *"
@@ -26,34 +42,58 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout site repo
+        uses: actions/checkout@v4
 
-      - uses: actions/checkout@v4
+      - name: Checkout website-factory-core (to _core)
+        uses: actions/checkout@v4
         with:
           repository: deedsy1/website-factory-core
           ref: ${{ github.event.inputs.core_ref || 'v1.0.0' }}
           path: _core
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - uses: actions/cache@v4
+      - name: Cache pip
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('_core/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - run: pip install -r _core/requirements.txt
+      - name: Install dependencies (core)
+        run: pip install -r _core/requirements.txt
 
-      - run: python _core/scripts/generate_pages.py --site-root .
+      - name: Generate pages
+        env:
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
+          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
+          PAGES_PER_RUN: ${{ inputs.pages_per_run }}
+          FACTORY_MODE: ${{ inputs.factory_mode }}
+          REGEN_RULE: ${{ inputs.regen_rule }}
+          REGEN_HUB: ${{ inputs.regen_hub }}
+          REGEN_SLUGS: ${{ inputs.regen_slugs }}
+        run: python _core/scripts/generate_pages.py --site-root .
 
-      - run: python _core/scripts/quality_gates.py --site-root .
+      - name: Quality gates
+        env:
+          DELETE_ON_FAIL: "1"
+        run: python _core/scripts/quality_gates.py --site-root .
 
-      - run: |
+      - name: Commit changes (never commit _core)
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add -A
-          git commit -m "chore: factory run" || echo "No changes"
+          git restore --staged _core || true
+          git rm -r --cached _core 2>/dev/null || true
+          rm -rf _core
+
+          git commit -m "chore: factory run" || echo "No changes to commit"
           git push

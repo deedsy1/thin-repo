@@ -4,20 +4,28 @@ on:
   workflow_dispatch:
     inputs:
       core_ref:
-        description: "Core version tag/branch"
+        description: "Core version tag/branch (pin for safety)"
         required: false
         default: "v1.0.0"
       niche:
-        description: "Site niche"
+        description: "Site niche (required)"
         required: true
+      tone:
+        description: "Optional tone"
+        required: false
+        default: ""
       title_count:
         description: "Titles to generate"
         required: false
         default: "300"
       pages_now:
-        description: "Pages to generate immediately"
+        description: "Generate N pages immediately after bootstrapping"
         required: false
         default: "5"
+      base_url:
+        description: "Optional baseURL"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -30,36 +38,70 @@ jobs:
   bootstrap:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout site repo
+        uses: actions/checkout@v4
 
-      - uses: actions/checkout@v4
+      - name: Checkout website-factory-core (to _core)
+        uses: actions/checkout@v4
         with:
           repository: deedsy1/website-factory-core
           ref: ${{ github.event.inputs.core_ref || 'v1.0.0' }}
           path: _core
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - uses: actions/cache@v4
+      - name: Cache pip
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('_core/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - run: pip install -r _core/requirements.txt
+      - name: Install dependencies (core)
+        run: pip install -r _core/requirements.txt
 
-      - run: python _core/scripts/bootstrap_site.py --site-root .
+      - name: Bootstrap site config + titles pool
+        env:
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
+          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
+          BOOTSTRAP_NICHE: ${{ inputs.niche }}
+          BOOTSTRAP_TONE: ${{ inputs.tone }}
+          BOOTSTRAP_BASE_URL: ${{ inputs.base_url }}
+          TITLE_COUNT: ${{ inputs.title_count }}
+          PAGES_NOW: ${{ inputs.pages_now }}
+        run: python _core/scripts/bootstrap_site.py --site-root .
 
-      - run: python _core/scripts/generate_pages.py --site-root .
+      - name: Generate initial pages
+        env:
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
+          KIMI_MODEL: ${{ secrets.KIMI_MODEL }}
+          PAGES_PER_RUN: ${{ inputs.pages_now }}
+          FACTORY_MODE: "generate"
+        run: python _core/scripts/generate_pages.py --site-root .
 
-      - run: python _core/scripts/quality_gates.py --site-root .
+      - name: Quality gates
+        env:
+          DELETE_ON_FAIL: "1"
+        run: python _core/scripts/quality_gates.py --site-root .
 
-      - run: |
+      - name: Commit bootstrap output (never commit _core)
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Stage everything EXCEPT the checked-out core folder.
           git add -A
-          git commit -m "chore: bootstrap site" || echo "No changes"
+          git restore --staged _core || true
+          git rm -r --cached _core 2>/dev/null || true
+
+          # Remove core checkout from workspace to avoid any accidental future staging
+          rm -rf _core
+
+          git commit -m "chore: bootstrap site" || echo "No changes to commit"
           git push
