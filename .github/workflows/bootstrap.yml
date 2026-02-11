@@ -7,9 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       site_slug:
-        description: "Site slug folder under sites/<slug> (e.g. home-espresso-basics)"
-        required: true
+        description: "Optional site slug folder under sites/<slug>. Leave blank to auto-generate from the niche."
+        required: false
         type: string
+        default: ""
       niche:
         description: "Niche/topic for the site (e.g. 'work anxiety', 'home espresso basics')"
         required: true
@@ -76,11 +77,31 @@ jobs:
       - name: Install dependencies (from core)
         run: pip install -r _core/requirements.txt
 
+      - name: Resolve site slug
+        id: slug
+        env:
+          NICHE: ${{ inputs.niche }}
+          SITE_SLUG: ${{ inputs.site_slug }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os, re
+
+          niche = (os.environ.get("NICHE") or "").strip()
+          slug = (os.environ.get("SITE_SLUG") or "").strip()
+          if not slug:
+            s = niche.lower()
+            s = re.sub(r"[^a-z0-9]+", "-", s)
+            s = re.sub(r"-+", "-", s).strip("-")
+            slug = s or "site"
+
+          print(f"slug={slug}")
+          PY
+
       - name: Ensure site folder exists
-        run: mkdir -p sites/${{ inputs.site_slug }}
+        run: mkdir -p sites/${{ steps.slug.outputs.slug }}
 
       - name: Bootstrap site identity + titles pool
-        run: python -u _core/scripts/bootstrap_site.py --site-root sites/${{ inputs.site_slug }}
+        run: python -u _core/scripts/bootstrap_site.py --site-slug "${{ steps.slug.outputs.slug }}"
 
       - name: Commit changes
         if: env.FACTORY_COMMIT_MODE == 'main'
