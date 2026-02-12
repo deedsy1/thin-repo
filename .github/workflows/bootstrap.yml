@@ -1,8 +1,9 @@
 env:
   REQUEST_TIMEOUT: 180
   CONNECT_TIMEOUT: 20
-  KIMI_HTTP_MAX_TRIES: 6
-  KIMI_BACKOFF_BASE: 1.7
+  # Retries/backoff are handled in core; keep these generic knobs.
+  HTTP_MAX_TRIES: 6
+  BACKOFF_BASE: 1.7
   MAX_OUTPUT_TOKENS: 1600
 
 name: Bootstrap Site
@@ -45,9 +46,10 @@ jobs:
       FACTORY_ENABLED: "1"
       FACTORY_COMMIT_MODE: "main"
 
-      MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-      MOONSHOT_BASE_URL: "https://api.moonshot.ai/v1"
-      KIMI_MODEL: "kimi-k2.5"
+      # Gemini
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # Use Flash-Lite by default (fast + cheap); you can change later.
+      GEMINI_MODEL: "gemini-2.5-flash"
       TEMPERATURE: "1"
       MAX_OUTPUT_TOKENS: "1600"
 
@@ -115,6 +117,9 @@ jobs:
 
       - name: Bootstrap site identity + titles pool
         run: python -u _core/scripts/bootstrap_site.py --site-slug "${{ steps.slug.outputs.slug }}"
+
+      - name: Generate pages now
+        run: python -u _core/scripts/generate_pages.py --site-slug "${{ steps.slug.outputs.slug }}" --count "${{ github.event.inputs.pages_now }}"
 
       - name: Commit changes
         if: env.FACTORY_COMMIT_MODE == 'main'

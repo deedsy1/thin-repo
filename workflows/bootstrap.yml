@@ -49,7 +49,7 @@ jobs:
       # Gemini
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       # Use Flash-Lite by default (fast + cheap); you can change later.
-      GEMINI_MODEL: "gemini-2.5-flash-lite"
+      GEMINI_MODEL: "gemini-2.5-flash"
       TEMPERATURE: "1"
       MAX_OUTPUT_TOKENS: "1600"
 

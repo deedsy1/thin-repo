@@ -67,18 +67,19 @@ jobs:
       FACTORY_ENABLED: "1"
       FACTORY_COMMIT_MODE: "main"
 
-      # Provider (Moonshot/Kimi)
-      MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
-      MOONSHOT_BASE_URL: "https://api.moonshot.ai/v1"
-      KIMI_MODEL: "kimi-k2.5"
-      TEMPERATURE: "1"
-      MAX_OUTPUT_TOKENS: "1600"
 
-      # Reliability knobs
+# Provider (Gemini)
+GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+# Set to the Gemini 2.5 family (requested). Swap to gemini-2.5-pro if you want deeper reasoning.
+GEMINI_MODEL: "gemini-2.5-flash"
+TEMPERATURE: "1"
+MAX_OUTPUT_TOKENS: "1600"
+
+# Reliability knobs
       REQUEST_TIMEOUT: 180
       CONNECT_TIMEOUT: 20
-      KIMI_HTTP_MAX_TRIES: 6
-      KIMI_BACKOFF_BASE: 1.7
+      HTTP_MAX_TRIES: 6
+      BACKOFF_BASE: 1.7
 
       PERF_MAX_PAGES: ${{ github.event.inputs.max_pages }}
       PERF_MAX_WORDS: ${{ github.event.inputs.max_words }}
