@@ -1,0 +1,76 @@
+site:
+  title: Living In Poverty
+  brand: Living In Poverty
+  language_code: en-us
+  base_url: https://YOUR-SITE.pages.dev/
+  default_meta_description: Practical explanations for living in poverty — neutral,
+    simple, no hype.
+  tagline: Practical explanations for living in poverty — neutral, simple, no hype.
+  niche: living in poverty
+theme:
+  pack: minimal-mono
+  font_sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial,
+    sans-serif
+  font_serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif
+  content_max: 74ch
+  radius: 16px
+taxonomy:
+  hubs:
+  - id: basics
+    label: Basics
+  - id: how-it-works
+    label: How It Works
+  - id: gear-setup
+    label: Gear & Setup
+  - id: troubleshooting
+    label: Troubleshooting
+  - id: comparisons
+    label: Comparisons
+generation:
+  forbidden_words:
+  - diagnose
+  - diagnosis
+  - prescribed
+  - guaranteed
+  - sue
+  - treatment
+  - treat
+  - cure
+  - therapist
+  - lawyer
+  - accountant
+  page_types:
+  - explainer
+  - checklist
+  - myth-vs-reality
+  - comparison
+  - troubleshooting
+  outline_h2:
+  - Intro
+  - Definitions and key terms
+  - Why this topic exists
+  - How people usually experience this
+  - How it typically works
+  - When this topic tends to come up
+  - Clarifying examples
+  - Common misconceptions
+  - Why this topic gets misunderstood online
+  - Related situations that feel similar
+  - Related topics and deeper reading
+  - Neutral summary
+  - FAQs
+  wordcount:
+    min: 900
+    ideal_min: 1100
+    ideal_max: 1600
+    max: 1900
+internal_linking:
+  enabled: true
+  min_links: 3
+  forbid_external: true
+ads: {}
+gates:
+  wordcount_min: 900
+  wordcount_max: 1900
+  min_internal_links: 3
+  forbid_external_links: true
