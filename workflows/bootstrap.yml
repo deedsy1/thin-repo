@@ -1,0 +1,137 @@
+env:
+  REQUEST_TIMEOUT: 180
+  CONNECT_TIMEOUT: 20
+  # Retries/backoff are handled in core; keep these generic knobs.
+  HTTP_MAX_TRIES: 6
+  BACKOFF_BASE: 1.7
+  MAX_OUTPUT_TOKENS: 1600
+
+name: Bootstrap Site
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_slug:
+        description: "Optional site slug folder under sites/<slug>. Leave blank to auto-generate from the niche."
+        required: false
+        type: string
+        default: ""
+      niche:
+        description: "Niche/topic for the site (e.g. 'work anxiety', 'home espresso basics')"
+        required: true
+      tone:
+        description: "Optional tone (e.g. 'calm, encyclopedic, beginner-friendly')"
+        required: false
+        default: ""
+      title_count:
+        description: "How many titles to generate into scripts/titles_pool.txt"
+        required: false
+        default: "300"
+      pages_now:
+        description: "How many pages to generate immediately after bootstrapping"
+        required: false
+        default: "5"
+      base_url:
+        description: "Optional baseURL for hugo.yaml (e.g. https://your-site.pages.dev/)"
+        required: false
+        default: ""
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-22.04
+    env:
+      FACTORY_ENABLED: "1"
+      FACTORY_COMMIT_MODE: "main"
+
+      # Gemini
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # Use Flash-Lite by default (fast + cheap); you can change later.
+      GEMINI_MODEL: "gemini-2.5-flash-lite"
+      TEMPERATURE: "1"
+      MAX_OUTPUT_TOKENS: "1600"
+
+      BOOTSTRAP_NICHE: ${{ github.event.inputs.niche }}
+      BOOTSTRAP_TONE: ${{ github.event.inputs.tone }}
+      TITLE_COUNT: ${{ github.event.inputs.title_count }}
+      PAGES_PER_RUN: ${{ github.event.inputs.pages_now }}
+      BOOTSTRAP_BASE_URL: ${{ github.event.inputs.base_url }}
+
+      MAX_ATTEMPTS: "25"
+      SLEEP_SECONDS: "0.3"
+
+    steps:
+      - name: Checkout site repo
+        uses: actions/checkout@v4
+
+      - name: STOP switch
+        if: env.FACTORY_ENABLED == '0'
+        run: |
+          echo "FACTORY DISABLED — exiting."
+          exit 0
+
+      - name: Checkout website-factory-core
+        uses: actions/checkout@v4
+        with:
+          repository: deedsy1/website-factory-core
+          path: _core
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies (from core)
+        run: pip install -r _core/requirements.txt
+
+      - name: Sanity check core scripts
+        run: |
+          python -m py_compile _core/scripts/bootstrap_site.py
+          python -m py_compile _core/scripts/generate_pages.py
+          python -m py_compile _core/scripts/quality_gates.py
+
+      - name: Resolve site slug
+        id: slug
+        env:
+          NICHE: ${{ inputs.niche }}
+          SITE_SLUG: ${{ inputs.site_slug }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os, re
+
+          niche = (os.environ.get("NICHE") or "").strip()
+          slug = (os.environ.get("SITE_SLUG") or "").strip()
+          if not slug:
+            s = niche.lower()
+            s = re.sub(r"[^a-z0-9]+", "-", s)
+            s = re.sub(r"-+", "-", s).strip("-")
+            slug = s or "site"
+
+          print(f"slug={slug}")
+          PY
+
+      - name: Ensure site folder exists
+        run: mkdir -p sites/${{ steps.slug.outputs.slug }}
+
+      - name: Bootstrap site identity + titles pool
+        run: python -u _core/scripts/bootstrap_site.py --site-slug "${{ steps.slug.outputs.slug }}"
+
+      - name: Generate pages now
+        run: python -u _core/scripts/generate_pages.py --site-slug "${{ steps.slug.outputs.slug }}" --count "${{ github.event.inputs.pages_now }}"
+
+      - name: Commit changes
+        if: env.FACTORY_COMMIT_MODE == 'main'
+        run: |
+          git config user.name "factory-bot"
+          git config user.email "factory@users.noreply.github.com"
+
+          # Only stage the expected site outputs (prevents accidental junk commits)
+          git add "sites/${{ steps.slug.outputs.slug }}"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Bootstrap: ${{ github.event.inputs.niche }}"
+          git push
